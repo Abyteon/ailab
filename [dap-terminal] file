@@ -1,0 +1,21 @@
+Some weights of the model checkpoint at hfl/chinese-bert-wwm w
+ere not used when initializing BertForMaskedLM: ['bert.pooler.
+dense.bias', 'bert.pooler.dense.weight', 'cls.seq_relationship
+.bias', 'cls.seq_relationship.weight']
+- This IS expected if you are initializing BertForMaskedLM fro
+m the checkpoint of a model trained on another task or with an
+other architecture (e.g. initializing a BertForSequenceClassif
+ication model from a BertForPreTraining model).
+- This IS NOT expected if you are initializing BertForMaskedLM
+ from the checkpoint of a model that you expect to be exactly 
+identical (initia
+identica
+Dev
+Som
+ere
+den
+.bi
+'cl
+_
+- T
+- This IS NOT exp

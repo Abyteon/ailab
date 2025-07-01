@@ -8,11 +8,39 @@ from transformers import (
 )
 from transformers.optimization import get_linear_schedule_with_warmup
 from torch.optim import AdamW
-from sklearn.model_selection import train_test_split
+
+# from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 
 class MyDataset(Dataset):
+    def __init__(self, file_path, tokenizer, max_len):
+        self.df = pd.read_csv(file_path)  # 需要两列：text,label
+        self.tokenizer = tokenizer
+        self.max_len = max_len
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        text = self.df.loc[idx, "text"]
+        label_id = self.df.loc[idx, "label_id"]
+        encoding = self.tokenizer(
+            text,
+            add_special_tokens=True,
+            max_length=self.max_len,
+            truncation=True,
+            padding="max_length",
+            return_tensors="pt",
+        )
+        return {
+            "input_ids": encoding["input_ids"].squeeze(0),
+            "attention_mask": encoding["attention_mask"].squeeze(0),
+            "labels": torch.tensor(label_id, dtype=torch.long),
+        }
+
+
+class AnathorDataset(Dataset):
     def __init__(self, texts, labels, tokenizer, max_len):
         self.texts = texts.tolist()
         self.labels = labels.tolist()
@@ -40,26 +68,39 @@ class MyDataset(Dataset):
         }
 
 
+MODULE_NAME = "hfl/chinese-bert-wwm"  # 使用中文BERT模型
 MAX_LEN = 128
 BATCH_SIZE = 16
-
-
-df = pd.read_csv("data.csv")  # 需要两列：sentence,label
-
-train_texts, val_texts, train_labels, val_labels = train_test_split(
-    df["sentence"], df["label"], test_size=0.2, random_state=42
+train_encoded_csv_file = (
+    "../../data/train_encoded_thucnews_data.csv"  # 假设已经编码好的CSV文件
+)
+val_encoded_csv_file = (
+    "../../data/val_encoded_thucnews_data.csv"  # 假设已经编码好的CSV文件
 )
 
-print("Train texts:", train_texts, train_labels)
-print("Val texts:", val_texts, val_labels)
 
-tokenizer = BertTokenizer.from_pretrained("bert-base-chinese")
+# df = pd.read_csv("data.csv")  # 需要两列：sentence,label
 
-train_dataset = MyDataset(train_texts, train_labels, tokenizer, MAX_LEN)
-val_dataset = MyDataset(val_texts, val_labels, tokenizer, MAX_LEN)
+# train_texts, val_texts, train_labels, val_labels = train_test_split(
+#     df["sentence"], df["label"], test_size=0.2, random_state=42
+# )
+
+# print("Train texts:", train_texts, train_labels)
+# print("Val texts:", val_texts, val_labels)
+
+tokenizer = BertTokenizer.from_pretrained(MODULE_NAME)
+
+# train_dataset = MyDataset(train_texts, train_labels, tokenizer, MAX_LEN)
+# val_dataset = MyDataset(val_texts, val_labels, tokenizer, MAX_LEN)
+#
+# train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+# val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
+
+train_dataset = MyDataset(train_encoded_csv_file, tokenizer, MAX_LEN)
+val_dataset = MyDataset(val_encoded_csv_file, tokenizer, MAX_LEN)
 
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
+val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 
 class MyBertClassifier(nn.Module):
@@ -77,11 +118,11 @@ class MyBertClassifier(nn.Module):
         return logits
 
 
-MODEL_NAME = "bert-base-chinese"
 EPOCHS = 3  # 假设训练3个epoch
-num_classes = len(set(train_labels))  # 根据标签数量设置输出类别数
+# num_classes = len(set(train_labels))  # 根据标签数量设置输出类别数
+num_classes = 10  # 假设有10个类别
 device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-model = MyBertClassifier(MODEL_NAME, num_classes).to(device)
+model = MyBertClassifier(MODULE_NAME, num_classes).to(device)
 optimizer = AdamW(model.parameters(), lr=2e-5, weight_decay=0.01)
 total_steps = len(train_loader) * EPOCHS  # 假设训练3个epoch
 scheduler = get_linear_schedule_with_warmup(
